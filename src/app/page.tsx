@@ -11,13 +11,31 @@ export default async function Home() {
 
   if (!user) redirect("/auth");
 
-  const { data: latestCycle } = await supabase
-    .from("cycles")
+
+  const { data: cycles } = await supabase
+  .from("cycles")
+  .select("*")
+  .eq("user_id", user.id)
+  .order("start_date", { ascending: true });
+
+  const latestCycle = cycles?.[cycles.length - 1] ?? null;
+
+
+
+
+  const { data: todayLog } = await supabase
+    .from("daily_logs")
     .select("*")
     .eq("user_id", user.id)
-    .order("start_date", { ascending: false })
-    .limit(1)
-    .single();
+    .eq("log_date", new Date().toISOString().split("T")[0])
+    .maybeSingle();
 
-  return <Dashboard latestCycle={latestCycle} />;
+    
+    return (
+      <Dashboard
+        latestCycle={latestCycle}
+        cycles={cycles ?? []}
+        todayLog={todayLog}
+      />
+    );
 }

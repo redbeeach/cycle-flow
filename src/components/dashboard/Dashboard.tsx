@@ -3,6 +3,7 @@
 import Header from "@/components/dashboard/Header";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase/client";
+import { getAverageCycleLength, getDaysUntilNextPeriod } from "@/utils/cycle";
 import {
   CalendarDays,
   Droplets,
@@ -10,15 +11,26 @@ import {
   NotebookPen,
   Sparkles,
 } from "lucide-react";
+type Cycle = {
+  id: string;
+  start_date: string;
+  end_date: string | null;
+};
+
 type DashboardProps = {
-  latestCycle: {
-    id: string;
-    start_date: string;
-    end_date: string | null;
+  latestCycle: Cycle | null;
+  cycles: Cycle[];
+  todayLog: {
+    mood: string | null;
+    pain_level: number | null;
+    bleeding: string | null;
+    memo: string | null;
   } | null;
 };
-export default function Dashboard({ latestCycle }: DashboardProps) {
-  
+
+export default function Dashboard({ latestCycle, cycles, todayLog }: DashboardProps) {
+  const averageCycle = getAverageCycleLength(cycles);
+  const daysUntilNextPeriod = getDaysUntilNextPeriod(cycles);
   const handleStartCycle = async () => {
     const {
       data: { user },
@@ -41,14 +53,39 @@ export default function Dashboard({ latestCycle }: DashboardProps) {
       return;
     }
 
-    alert("생리 시작 저장 완료");
+    alert("생리 시작");
+    location.reload();
   };
-const cycleDay = latestCycle
-  ? Math.floor(
-      (new Date().getTime() - new Date(latestCycle.start_date).getTime()) /
-        (1000 * 60 * 60 * 24)
-    ) + 1
-  : null;
+  const handleEndCycle = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("cycles")
+      .update({
+        end_date: new Date().toISOString().split("T")[0],
+      })
+      .eq("user_id", user.id)
+      .is("end_date", null);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("생리 종료");
+    location.reload();
+  };
+  const cycleDay = latestCycle
+    ? Math.floor(
+        (new Date().getTime() - new Date(latestCycle.start_date).getTime()) /
+          (1000 * 60 * 60 * 24)
+      ) + 1
+    : null;
+  const isCycling = latestCycle?.end_date === null;
   return (
     <div className="flex flex-col gap-5 pb-32">
       <Header />
@@ -64,11 +101,13 @@ const cycleDay = latestCycle
           <div className="mt-6 flex items-end justify-between">
             <div>
               <p className="text-sm text-white/75">다음 생리까지</p>
-              <p className="text-3xl font-black">17일</p>
+              <p className="text-3xl font-black">
+                {daysUntilNextPeriod !== null ? `${daysUntilNextPeriod}일` : "-"}
+              </p>
             </div>
 
             <div className="rounded-full bg-white/20 px-4 py-2 text-sm font-bold backdrop-blur">
-              2 / 5일
+              {cycleDay ?? "-"} / 5일
             </div>
           </div>
 
@@ -84,7 +123,7 @@ const cycleDay = latestCycle
             <HeartPulse size={20} />
           </div>
           <p className="text-xs text-muted-foreground">컨디션</p>
-          <p className="mt-1 font-bold">좋음</p>
+          <p className="mt-1 font-bold">{todayLog?.mood ?? "-"}</p>
         </div>
 
         <div className="rounded-[1.5rem] bg-white p-4 shadow-sm">
@@ -92,7 +131,7 @@ const cycleDay = latestCycle
             <Sparkles size={20} />
           </div>
           <p className="text-xs text-muted-foreground">단계</p>
-          <p className="mt-1 font-bold">월경기</p>
+          <p className="mt-1 font-bold">통증 {todayLog?.pain_level ?? 0}</p>
         </div>
 
         <div className="rounded-[1.5rem] bg-white p-4 shadow-sm">
@@ -100,7 +139,7 @@ const cycleDay = latestCycle
             <CalendarDays size={20} />
           </div>
           <p className="text-xs text-muted-foreground">예정일</p>
-          <p className="mt-1 font-bold">7.22</p>
+          <p className="mt-1 font-bold">{todayLog?.bleeding ?? "-"}</p>
         </div>
       </section>
 
@@ -112,11 +151,13 @@ const cycleDay = latestCycle
 
         <div className="grid grid-cols-3 gap-3">
           <Button
-            onClick={handleStartCycle}
+            onClick={isCycling ? handleEndCycle : handleStartCycle}
             className="h-24 flex-col gap-2 rounded-[1.35rem] bg-zinc-950 text-white hover:bg-zinc-800"
           >
             <Droplets size={24} />
-            <span className="text-sm">생리 시작</span>
+            <span className="text-sm">
+              {isCycling ? "생리 종료" : "생리 시작"}
+            </span>
           </Button>
 
           <Button

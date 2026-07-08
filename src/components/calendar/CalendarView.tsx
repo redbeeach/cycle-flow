@@ -2,11 +2,21 @@ import AppShell from "@/components/layout/AppShell";
 import BottomNav from "@/components/layout/BottomNav";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+type Cycle = {
+  id: string;
+  start_date: string;
+  end_date: string | null;
+};
+
+type CalendarViewProps = {
+  cycles: Cycle[];
+};
+
 const days = ["일", "월", "화", "수", "목", "금", "토"];
 
 const dates = Array.from({ length: 35 }, (_, i) => i + 1);
 
-export default function CalendarView() {
+export default function CalendarView({ cycles }: CalendarViewProps) {
   return (
     <AppShell>
       <div className="flex flex-col gap-5 pb-32">
@@ -34,7 +44,17 @@ export default function CalendarView() {
 
           <div className="grid grid-cols-7 gap-2">
             {dates.map((date) => {
-              const isPeriod = [2, 3, 4, 5, 6].includes(date);
+              const currentMonth = "2026-07";
+
+              const dateString = `${currentMonth}-${String(date).padStart(2, "0")}`;
+
+              const isPeriod = cycles.some((cycle) => {
+                const start = new Date(cycle.start_date);
+                const end = new Date(cycle.end_date ?? cycle.start_date);
+                const target = new Date(dateString);
+
+                return target >= start && target <= end;
+              });
               const isOvulation = date === 16;
               const isFertile = [12, 13, 14, 15, 17].includes(date);
 
